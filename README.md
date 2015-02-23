@@ -3,14 +3,12 @@ Smart color picker plugin for Sublime Text 3. This plugin scan the current CSS f
 
 ## Installation
 Sublime Text Version 3071 Required!
-Currently the package is only available as a download from github but will eventually be available through package control. 
+Currently the package is only available as a download from github but will eventually be available through package control.
 
 ## Usage
-The color index is created on activate, and the color picker can be displayed using the following keyboard command:
+The color index is created on activate, and the color picker is displayed when the "#" is entered in a css file.
 
-- Linux: `ctrl+alt+space`
-- Windows: `ctrl+alt+space`
-- OS X: `cmd+alt+space`
+![SmartColorPicker](/smart_color_picker.png)
 
 ## Future Plans
 - Include html, php, asp file types
