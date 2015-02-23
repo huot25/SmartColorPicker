@@ -6,20 +6,83 @@ last_check = 0
 
 class ColorCheckListener(sublime_plugin.EventListener):
 	def on_activated_async(self, view):
-		if (view.file_name().endswith("css")):
-			view.run_command("select_hex_colors")
+		self.run(view, index_only=True, force=True)
 
-class SelectHexColorsCommand(sublime_plugin.TextCommand):
+	def on_selection_modified_async(self, view):
+		self.run(view)
+
+	def run(self, view, index_only=False, force=False):
+		print ("HERE 2")
+
+		if "css" not in view.scope_name(view.sel()[0].b):
+			return
+
+		ColorIndexer(view).index_colors(force)
+
+		if (index_only):
+			return
+
+		scopes = [
+			"meta.property-value.css"
+		]
+
+		scope_name = view.scope_name(view.sel()[0].b)
+
+		for scope in scopes:
+			if (scope+'') in scope_name:
+				if (scope == 'constant.other.color.rgb-value.css' or scope == 'meta.property-value.css') and '#' in view.substr(view.word(view.sel()[0])):
+					view.run_command("display_color_picker")
+					return
+
+		view.hide_popup()
+
+class DisplayColorPickerCommand(sublime_plugin.TextCommand):
+	def run(self, edit):
+		self.show_color_picker()
+
+	def handle_selected_color(self, color):
+		self.view.run_command("insert", {"characters": color.lstrip("#")})
+		self.view.hide_popup()
+
+	def show_color_picker(self):
+		global color_index
+		max_row = 4
+		html = ""
+		project_colors = [("#252525", 1), ("#313131", 1), ("#265874", 1), ("#987641", 1)]
+
+		html += self.build_swatches(project_colors, max_row)
+		html += "<div></div>"
+		html += self.build_swatches(color_index, max_row)
+
+		html += "<style>body{padding:0px; margin:2px;}</style>"
+		self.view.show_popup(html, sublime.COOPERATE_WITH_AUTO_COMPLETE, on_navigate=self.handle_selected_color)
+
+	def build_swatches(self, colors, max_row):
+		html = ""
+		for i, color in enumerate(colors):
+			# html= '<div style="display:inline-block; background-color:{0}; margin:2px;"><a href="{0}" style="color:{0}; font-size:20px; font-family:courier;">aa</a></div>'.format(color[0])
+			html += '<span style="background-color:{0}; margin:2px;"><a href="{0}" style="color:{0}; width:50px; height:50px; font-size:20px;">██</a></span> '.format(color[0])
+
+			if(not (i+1) % max_row):
+				html += "<div></div>"
+
+		return html
+
+class ColorIndexer():
 
 	HEX_REGEX = "\#[a-f0-9]{3}(?:[a-f0-9]{3})?"
 
-	def run(self, edit):
+	def __init__(self, view):
+		self.view = view
+
+	def index_colors(self, force=False):
 		global color_index
 		global last_check
+		check_interval = 5
 
-		check_interval = 30
+		print ("HERE")
 
-		if ((time.time() - last_check) < check_interval):
+		if ((time.time() - last_check) < check_interval) and not force:
 			return
 
 		matches = self.get_hex_colors()
@@ -38,39 +101,17 @@ class SelectHexColorsCommand(sublime_plugin.TextCommand):
 		for match in matches:
 			hex_color = self.view.substr(match)
 
-			#convert short hand colors to full values
-			if (len(hex_color) < 7):
-				hex_color = "#" + hex_color[1:]*2
+			if (len(hex_color) < 4):
+				c = "#"
+				for char in hex_color:
+					c += char * 2
 
-			#record the number of times the color was used
+				hex_color = c
+
 			if (hex_color in index):
 				index[hex_color] = int(index[hex_color] + 1)
 			else:
 				index[hex_color] = int(1)
 
-		#sort based on value
 		sorted_index = sorted(index.items(), key=operator.itemgetter(1), reverse=True)
 		return sorted_index
-
-
-class DisplayColorPickerCommand(sublime_plugin.TextCommand):
-	def run(self, edit):
-		self.show_color_picker()
-
-	def handle_selected_color(self, color):
-		self.view.run_command("insert", {"characters": color})
-		self.view.hide_popup()
-
-	def show_color_picker(self):
-		global color_index
-		max_items = 10
-		html = ""
-
-		for i, color in enumerate(color_index):
-			if (i > max_items):
-				break
-
-			html += '<div style="background-color: #cccccc;"><div style="display:inline-block; background-color:{0}; margin:2px;"><a href="{0}" style="color:{0}; font-size:20px; font-family:courier;">aa</a></div></div>'.format(color[0])
-
-		self.view.show_popup(html, on_navigate=self.handle_selected_color)
-		
