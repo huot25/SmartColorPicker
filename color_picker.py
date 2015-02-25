@@ -1,5 +1,4 @@
-import sublime, sublime_plugin, operator, time
-from glob import glob
+import sublime, sublime_plugin, operator, time, fnmatch, os
 
 color_index = {}
 last_check = 0
@@ -12,9 +11,6 @@ class ColorCheckListener(sublime_plugin.EventListener):
 		self.run(view)
 
 	def run(self, view, index_only=False, force=False):
-		if "css" not in view.scope_name(view.sel()[0].b):
-			return
-
 		ColorIndexer(view).index_colors(force)
 
 		if (index_only):
@@ -63,7 +59,6 @@ class DisplayColorPickerCommand(sublime_plugin.TextCommand):
 	def build_swatches(self, colors, max_row):
 		html = ""
 		for i, color in enumerate(colors):
-			# html= '<div style="display:inline-block; background-color:{0}; margin:2px;"><a href="{0}" style="color:{0}; font-size:20px; font-family:courier;">aa</a></div>'.format(color[0])
 			html += '<span style="background-color:{0}; margin:2px;"><a href="{0}" style="color:{0}; width:50px; height:50px; font-size:20px;">██</a></span> '.format(color[0])
 
 			if(not (i+1) % max_row):
@@ -81,15 +76,45 @@ class ColorIndexer():
 	def index_colors(self, force=False):
 		global color_index
 		global last_check
-		check_interval = 5
+		check_interval = 20
 
 		if ((time.time() - last_check) < check_interval) and not force:
 			return
 
-		matches = self.get_hex_colors()
+		files = self.select_files()
+		matches = self.scan_files(files)
+
 		color_index = self.index_matches(matches)
 		last_check = time.time()
-		print ("Color Picker: Colors indexed")
+		self.show_message("Colors indexed!")
+
+	def select_files(self):
+		project = self.view.window().project_data();
+		index_files = []
+		file_ext = ["*.css", "*.html", "*.php"]
+
+		for folder in project["folders"]:
+			for root, dirs, files in os.walk(folder["path"]):
+				for file in files:
+					for pattern in file_ext:
+						if fnmatch.fnmatch(file, pattern):
+							 index_files.append(os.path.join(root, file))
+							 break;
+
+		return index_files
+
+	def scan_files(self, files):
+		import mmap, re
+		matches = []
+		for file in files:
+			file_matches = []
+			with open(file, "r+b") as f:
+				mm = mmap.mmap(f.fileno(), 0)
+				mm.seek(0)
+				file_matches = re.findall(self.HEX_REGEX, mm.read().decode())
+				matches.extend(file_matches)
+				mm.close()
+		return matches
 
 	def get_hex_colors(self):
 		matches = self.view.find_all(self.HEX_REGEX, sublime.IGNORECASE)
@@ -106,11 +131,10 @@ class ColorIndexer():
 		return color.upper()
 
 	def index_matches(self, matches):
+		self.show_message("Indexing colors")
 		index = {}
 
-		print ("Color Picker: Indexing colors")
-		for match in matches:
-			hex_color = self.view.substr(match)
+		for hex_color in matches:
 			hex_color = self.normalize_color(hex_color)
 
 			if (hex_color in index):
@@ -120,3 +144,8 @@ class ColorIndexer():
 
 		sorted_index = sorted(index.items(), key=operator.itemgetter(1), reverse=True)
 		return sorted_index
+
+	def show_message(self, message):
+		msg = "Color Picker: " + message
+		print (msg)
+		sublime.status_message(msg)
