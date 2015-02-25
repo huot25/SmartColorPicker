@@ -12,8 +12,6 @@ class ColorCheckListener(sublime_plugin.EventListener):
 		self.run(view)
 
 	def run(self, view, index_only=False, force=False):
-		print ("HERE 2")
-
 		if "css" not in view.scope_name(view.sel()[0].b):
 			return
 
@@ -41,12 +39,17 @@ class DisplayColorPickerCommand(sublime_plugin.TextCommand):
 		self.show_color_picker()
 
 	def handle_selected_color(self, color):
+		line = self.view.line(self.view.sel()[0])
+		pos = self.view.find("#", line.begin())
+		self.view.sel().clear()
+		self.view.sel().add(sublime.Region(pos.end(), pos.end()))
+		
 		self.view.run_command("insert", {"characters": color.lstrip("#")})
 		self.view.hide_popup()
 
 	def show_color_picker(self):
 		global color_index
-		max_row = 4
+		max_row = 6
 		html = ""
 		project_colors = [("#252525", 1), ("#313131", 1), ("#265874", 1), ("#987641", 1)]
 
@@ -80,8 +83,6 @@ class ColorIndexer():
 		global last_check
 		check_interval = 5
 
-		print ("HERE")
-
 		if ((time.time() - last_check) < check_interval) and not force:
 			return
 
@@ -94,19 +95,23 @@ class ColorIndexer():
 		matches = self.view.find_all(self.HEX_REGEX, sublime.IGNORECASE)
 		return matches
 
+	def normalize_color(self, color):
+		if (len(color) < 5):
+			c = "#"
+			for char in color.lstrip("#"):
+				c += char +char
+
+			color = c
+
+		return color.upper()
+
 	def index_matches(self, matches):
 		index = {}
 
 		print ("Color Picker: Indexing colors")
 		for match in matches:
 			hex_color = self.view.substr(match)
-
-			if (len(hex_color) < 4):
-				c = "#"
-				for char in hex_color:
-					c += char * 2
-
-				hex_color = c
+			hex_color = self.normalize_color(hex_color)
 
 			if (hex_color in index):
 				index[hex_color] = int(index[hex_color] + 1)
