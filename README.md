@@ -12,7 +12,8 @@ The color index is created on activate, and the color picker is displayed when t
 
 ## Future Plans
 - Include html, php, asp file types
-- Scan entire project to build a project level index
+Done- Scan entire project to build a project level index
 - Allow users to exclude files and folders from indexing (libraries such Twitter bootstrap, or base css files)
 - Allow user to define project colors which will always display at the top of the color list.
 - If Sublime allows inline background colors in the future, I would like to display the color list in rows of 8 or so to make it easier to see a large collection of colors.
+- Create a method to import Adobe .ase color palletes downloaded from Kuler or exported from Adobe product.
