@@ -17,3 +17,4 @@ Done- Scan entire project to build a project level index
 - Allow user to define project colors which will always display at the top of the color list.
 - If Sublime allows inline background colors in the future, I would like to display the color list in rows of 8 or so to make it easier to see a large collection of colors.
 - Create a method to import Adobe .ase color palletes downloaded from Kuler or exported from Adobe product.
+- Create plugin settings to adjust some settings such as indexing frequency and number of colors per line in tooltip.
