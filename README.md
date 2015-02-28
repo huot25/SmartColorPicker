@@ -22,6 +22,6 @@ The users can manually selection files or folders that they would not like to in
 
 ## Future Plans
 - Include html, php, asp file types
-- Allow users to exclude files and folders from indexing (libraries such Twitter bootstrap, or base css files)
 - Create a method to import Adobe .ase color palettes downloaded from Kuler or exported from Adobe product.
 - Create plugin settings to adjust some settings such as indexing frequency and number of colors per line in tooltip.
+- Limit Plugin to syntax types for css and html for now.
