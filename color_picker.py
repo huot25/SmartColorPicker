@@ -1,7 +1,8 @@
-import sublime, sublime_plugin, operator, time, fnmatch, os, threading
+import sublime, sublime_plugin, operator, time, fnmatch, os, threading, re, mmap
 
 color_index = {}
 last_check = 0
+HEX_REGEX = "\#[a-f0-9]{3}(?:[a-f0-9]{3})?"
 
 def normalize_color(color):
 	if (len(color) < 5):
@@ -12,6 +13,13 @@ def normalize_color(color):
 		color = c
 
 	return color.upper()
+
+def is_valid_color(color):
+	global HEX_REGEX
+	matches = re.findall(HEX_REGEX, color, re.IGNORECASE)
+
+	return (len(matches) > 0)
+
 
 class ColorCheckListener(sublime_plugin.EventListener):
 	def on_activated_async(self, view):
@@ -26,10 +34,7 @@ class ColorCheckListener(sublime_plugin.EventListener):
 		if (index_only):
 			return
 
-		scopes = [
-			"meta.property-value.css"
-		]
-
+		scopes = [ "meta.property-value.css" ]
 		scope_name = view.scope_name(view.sel()[0].b)
 
 		for scope in scopes:
@@ -57,24 +62,23 @@ class DisplayColorPickerCommand(sublime_plugin.TextCommand):
 		global color_index
 		max_row = 6
 		html = ""
+
 		project_helper = ProjectHelper(self.view)
 		project_colors = project_helper.get_project_colors()
 
-		html += '<span class="projectWrapper">'
 		html += self.build_swatches(project_colors, max_row)
-		html += "</span><div>&nbsp;</div>"
+		html += "<div>&nbsp;</div>"
 		html += self.build_swatches(color_index, max_row)
-
-		html += "<style>body{padding:0px; margin:2px;} .projectWrapper{background:#99ff99, padding:10px;} a{margin:10px; }</style>"
+		html += "<style>body{padding:0px; margin:2px;} </style>"
 
 		self.view.show_popup(html, sublime.COOPERATE_WITH_AUTO_COMPLETE, on_navigate=self.handle_selected_color)
 
 	def build_swatches(self, colors, max_row):
 		html = ""
 		for i, color in enumerate(colors):
-			html += '<a href="{0}" style="background-color:{0}; color:{0}; width:50px; height:50px; font-size:40px;">█</a>'.format(color[0])
+			html += '<a href="{0}" style="background-color:{0}; color:{0}; font-size:40px;">█</a>'.format(color[0])
 
-			if(not (i+1) % max_row):
+			if((i+1) % max_row == 0):
 				html += "<div></div>"
 
 		return html
@@ -83,9 +87,79 @@ class SetProjectColorsCommand(sublime_plugin.WindowCommand):
 	def run(self):
 		ProjectHelper(self.window.active_view()).set_colors()
 
+class ExcludeFromIndexCommand(sublime_plugin.WindowCommand):
+	def run(self, paths=[]):
+		files = []
+		folders = []
+
+		project_helper = ProjectHelper(self.window.active_view())
+		excl_files = project_helper.get_excluded_files()
+		excl_folders = project_helper.get_excluded_folders()
+
+		for path in paths:
+			if os.path.isdir(path):
+				if( path in excl_folders):
+					continue
+
+				folders.append(path)
+
+			if os.path.isfile(path):
+				if( path in excl_files):
+					continue
+				
+				files.append(path)
+
+		folders = excl_folders + folders
+		files = excl_files + files
+
+		project_helper.set_excluded_folders(folders)
+		project_helper.set_excluded_files(files)
+
+	def is_enabled(self, paths=[]):
+		project_helper = ProjectHelper(self.window.active_view())
+		excl_files = project_helper.get_excluded_files()
+		excl_folders = project_helper.get_excluded_folders()
+		excluded = excl_files + excl_folders
+		
+		return any(t not in excluded for t in paths)
+
+class IncludeIndexCommand(sublime_plugin.WindowCommand):
+	def run(self, paths=[]):
+		files = []
+		folders = []
+		for path in paths:
+			if os.path.isdir(path):
+				folders.append(path)
+			if os.path.isfile(path):
+				files.append(path)
+
+		project_helper = ProjectHelper(self.window.active_view())
+
+		excl_files = project_helper.get_excluded_files()
+		excl_folders = project_helper.get_excluded_folders()
+
+		for path in paths:
+			if (path in excl_files):
+				excl_files.remove(path)
+
+			if (path in excl_folders):
+				excl_folders.remove(path)
+
+		project_helper.set_excluded_folders(excl_folders)
+		project_helper.set_excluded_files(excl_files)
+
+
+	def is_enabled(self, paths=[]):
+		project_helper = ProjectHelper(self.window.active_view())
+		excl_files = project_helper.get_excluded_files()
+		excl_folders = project_helper.get_excluded_folders()
+		excluded = excl_files + excl_folders
+		
+		return any(t in excluded for t in paths)
+
+
 class ColorIndexer(threading.Thread):
 
-	HEX_REGEX = "\#[a-f0-9]{3}(?:[a-f0-9]{3})?"
 	check_interval = 20
 	color_index = []
 
@@ -119,13 +193,23 @@ class ColorIndexer(threading.Thread):
 		self.show_message("Colors indexed!")
 
 	def select_files(self):
-		project = self.view.window().project_data();
+		project_helper = ProjectHelper(self.view)
+		project = project_helper.project_data
+		exlc_folders = project_helper.get_excluded_folders()
+		exlc_files = project_helper.get_excluded_files()
+
 		index_files = []
 		file_ext = ["*.css", "*.html", "*.php"]
 
 		for folder in project["folders"]:
 			for root, dirs, files in os.walk(folder["path"]):
+				if root in exlc_folders:
+					continue
+
 				for file in files:
+					if os.path.join(root, file) in exlc_files:
+						continue
+
 					for pattern in file_ext:
 						if fnmatch.fnmatch(file, pattern):
 							 index_files.append(os.path.join(root, file))
@@ -134,14 +218,14 @@ class ColorIndexer(threading.Thread):
 		return index_files
 
 	def scan_files(self, files):
-		import mmap, re
+		global HEX_REGEX
 		matches = []
 		for file in files:
 			file_matches = []
 			with open(file, "r+b") as f:
 				mm = mmap.mmap(f.fileno(), 0)
 				mm.seek(0)
-				file_matches = re.findall(self.HEX_REGEX, mm.read().decode())
+				file_matches = re.findall(HEX_REGEX, mm.read().decode())
 				matches.extend(file_matches)
 				mm.close()
 		return matches
@@ -202,14 +286,33 @@ class ProjectHelper():
 
 		return norm_colors
 
-	def set_colors(self):
-		project_colors = self.get_project_colors()
+	def get_excluded_folders(self):
+		return self.get_project_settings().get("excluded_folders", [])
 
-		color_list = []
-		for color, i in project_colors:
-			color_list.append(color)
+	def set_excluded_folders(self, folders):
+		settings = self.get_project_settings()
+		settings["excluded_folders"] = folders
+		self.project_data["settings"] = settings
+		self.update_project_data()
 
-		text = ", ".join(color_list)
+	def get_excluded_files(self):
+		return self.get_project_settings().get("excluded_files", [])
+
+	def set_excluded_files(self, files):
+		settings = self.get_project_settings()
+		settings["excluded_files"] = files
+		self.project_data["settings"] = settings
+		self.update_project_data()
+
+	def set_colors(self, text=""):
+		if not len(text):
+			project_colors = self.get_project_colors()
+
+			color_list = []
+			for color, i in project_colors:
+				color_list.append(color)
+
+			text = ", ".join(color_list)
 
 		self.view.window().show_input_panel("Enter a comma seperated list of hexidecimal colors: ", text, self.store_colors, None, None)
 
@@ -221,7 +324,13 @@ class ProjectHelper():
 		tmp_colors = [x.strip() for x in colors.split(",")]
 
 		for color in tmp_colors:
-			project_colors.append(normalize_color(color))
+			color = normalize_color(color)
+			if not is_valid_color(color):
+				sublime.error_message("One or more of your colors is invalid!")
+				self.set_colors(colors)
+				return
+
+			project_colors.append(color)
 
 		if  not "settings" in self.project_data:
 			self.project_data["settings"] = {}
@@ -231,3 +340,5 @@ class ProjectHelper():
 
 	def update_project_data(self):
 		self.view.window().set_project_data(self.project_data)
+
+
