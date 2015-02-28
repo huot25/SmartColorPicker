@@ -15,6 +15,11 @@ The color index is created on activate, and the color picker is displayed when t
 ###Project Colors
 To add project colors which will be displayed at the top of the color list, simply execute the "Smart Color Picker: Set Project Colors" command to display an input panel which accepts a comma delimited list of hexidecimal colors. These colors will be displayed at the top of the color swatches and will not be included in the list of indexed colors below.
 
+###Exclude/Include in index
+The users can manually selection files or folders that they would not like to include in the indexing process. This was added to handle css libraries or other areas of the application that the users does not wish to include. Simpley right click on a file/folder in the side bar and select "Smart Color Picker > Exclude from indexing". If the file has already been excluded, the include option will be available.
+
+![SmartColorPicker](/include_exclude.png)
+
 ## Future Plans
 - Include html, php, asp file types
 - Allow users to exclude files and folders from indexing (libraries such Twitter bootstrap, or base css files)

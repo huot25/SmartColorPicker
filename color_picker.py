@@ -92,6 +92,9 @@ class ExcludeFromIndexCommand(sublime_plugin.WindowCommand):
 		files = []
 		folders = []
 
+		if not len(paths):
+			paths = [self.window.active_view().file_name()]
+
 		project_helper = ProjectHelper(self.window.active_view())
 		excl_files = project_helper.get_excluded_files()
 		excl_folders = project_helper.get_excluded_folders()
@@ -120,6 +123,9 @@ class ExcludeFromIndexCommand(sublime_plugin.WindowCommand):
 		excl_files = project_helper.get_excluded_files()
 		excl_folders = project_helper.get_excluded_folders()
 		excluded = excl_files + excl_folders
+
+		if not len(paths):
+			paths = [self.window.active_view().file_name()]
 		
 		return any(t not in excluded for t in paths)
 
@@ -127,6 +133,10 @@ class IncludeIndexCommand(sublime_plugin.WindowCommand):
 	def run(self, paths=[]):
 		files = []
 		folders = []
+
+		if not len(paths):
+			paths = [self.window.active_view().file_name()]
+
 		for path in paths:
 			if os.path.isdir(path):
 				folders.append(path)
@@ -154,6 +164,9 @@ class IncludeIndexCommand(sublime_plugin.WindowCommand):
 		excl_files = project_helper.get_excluded_files()
 		excl_folders = project_helper.get_excluded_folders()
 		excluded = excl_files + excl_folders
+
+		if not len(paths):
+			paths = [self.window.active_view().file_name()]
 		
 		return any(t in excluded for t in paths)
 

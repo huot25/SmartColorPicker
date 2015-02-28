@@ -1,0 +1,19 @@
+[
+	{ "caption": "-" , "id":"side-bar-end-separator"},
+	{
+		"caption": "Smart Color Picker", "id":"side-bar-scp",
+		"children":
+		[
+			{
+				 "caption": "Exclude from indexing",
+				 "command": "exclude_from_index",
+				 "args": {"paths": []}
+			},
+			{
+				"caption": "Include in indexing",
+				"command": "include_index",
+				 "args": {"paths": []}
+			},
+		]
+	}
+]
